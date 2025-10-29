@@ -1,0 +1,146 @@
+name: Deploy
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-west-2
+  STACK_NAME: gorillabooks-production
+  # Optional: Set these to enable custom domain with HTTPS
+  DOMAIN_NAME: ''  # e.g., gorillabooks.net
+  HOSTED_ZONE_ID: ''  # e.g., Z1234567890ABC
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy-infrastructure:
+    name: Deploy Infrastructure
+    runs-on: ubuntu-latest
+    outputs:
+      backend-ecr: ${{ steps.stack-outputs.outputs.backend-ecr }}
+      frontend-ecr: ${{ steps.stack-outputs.outputs.frontend-ecr }}
+      cluster-name: ${{ steps.stack-outputs.outputs.cluster-name }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy CloudFormation Stack
+        run: |
+          PARAMS="Environment=production AppName=gorillabooks"
+
+          if [ -n "${{ env.DOMAIN_NAME }}" ]; then
+            PARAMS="$PARAMS DomainName=${{ env.DOMAIN_NAME }}"
+            echo "📍 Deploying with custom domain: ${{ env.DOMAIN_NAME }}"
+          fi
+
+          if [ -n "${{ env.HOSTED_ZONE_ID }}" ]; then
+            PARAMS="$PARAMS HostedZoneId=${{ env.HOSTED_ZONE_ID }}"
+          fi
+
+          aws cloudformation deploy \
+            --template-file infrastructure/cloudformation/main.yml \
+            --stack-name ${{ env.STACK_NAME }} \
+            --parameter-overrides $PARAMS \
+            --capabilities CAPABILITY_IAM \
+            --no-fail-on-empty-changeset
+
+      - name: Get Stack Outputs
+        id: stack-outputs
+        run: |
+          BACKEND_ECR=$(aws cloudformation describe-stacks \
+            --stack-name ${{ env.STACK_NAME }} \
+            --query 'Stacks[0].Outputs[?OutputKey==`BackendECRRepository`].OutputValue' \
+            --output text)
+          FRONTEND_ECR=$(aws cloudformation describe-stacks \
+            --stack-name ${{ env.STACK_NAME }} \
+            --query 'Stacks[0].Outputs[?OutputKey==`FrontendECRRepository`].OutputValue' \
+            --output text)
+          CLUSTER_NAME=$(aws cloudformation describe-stacks \
+            --stack-name ${{ env.STACK_NAME }} \
+            --query 'Stacks[0].Outputs[?OutputKey==`ECSClusterName`].OutputValue' \
+            --output text)
+
+          echo "backend-ecr=$BACKEND_ECR" >> $GITHUB_OUTPUT
+          echo "frontend-ecr=$FRONTEND_ECR" >> $GITHUB_OUTPUT
+          echo "cluster-name=$CLUSTER_NAME" >> $GITHUB_OUTPUT
+
+  deploy-application:
+    name: Deploy Application
+    runs-on: ubuntu-latest
+    needs: deploy-infrastructure
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push backend image
+        env:
+          ECR_REPOSITORY: ${{ needs.deploy-infrastructure.outputs.backend-ecr }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REPOSITORY:$IMAGE_TAG ./backend
+          docker push $ECR_REPOSITORY:$IMAGE_TAG
+          docker tag $ECR_REPOSITORY:$IMAGE_TAG $ECR_REPOSITORY:latest
+          docker push $ECR_REPOSITORY:latest
+
+      - name: Build, tag, and push frontend image
+        env:
+          ECR_REPOSITORY: ${{ needs.deploy-infrastructure.outputs.frontend-ecr }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REPOSITORY:$IMAGE_TAG ./frontend
+          docker push $ECR_REPOSITORY:$IMAGE_TAG
+          docker tag $ECR_REPOSITORY:$IMAGE_TAG $ECR_REPOSITORY:latest
+          docker push $ECR_REPOSITORY:latest
+
+      - name: Force ECS service update
+        env:
+          CLUSTER_NAME: ${{ needs.deploy-infrastructure.outputs.cluster-name }}
+        run: |
+          aws ecs update-service \
+            --cluster $CLUSTER_NAME \
+            --service gorillabooks-production-backend \
+            --force-new-deployment \
+            --no-cli-pager
+
+          aws ecs update-service \
+            --cluster $CLUSTER_NAME \
+            --service gorillabooks-production-frontend \
+            --force-new-deployment \
+            --no-cli-pager
+
+      - name: Wait for services to stabilize
+        env:
+          CLUSTER_NAME: ${{ needs.deploy-infrastructure.outputs.cluster-name }}
+        run: |
+          aws ecs wait services-stable \
+            --cluster $CLUSTER_NAME \
+            --services gorillabooks-production-backend gorillabooks-production-frontend
+
+      - name: Get Application URL
+        run: |
+          ALB_URL=$(aws cloudformation describe-stacks \
+            --stack-name ${{ env.STACK_NAME }} \
+            --query 'Stacks[0].Outputs[?OutputKey==`LoadBalancerURL`].OutputValue' \
+            --output text)
+          echo "🚀 Application deployed successfully!"
+          echo "📍 Access your app at: $ALB_URL"
