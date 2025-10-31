@@ -8,12 +8,13 @@ on:
   workflow_dispatch:
 
 env:
-  # AWS_REGION can be set here or as a repository variable
+  # Pull from repository variables (or use defaults)
   AWS_REGION: ${{ vars.AWS_REGION || 'us-west-2' }}
+  AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
   STACK_NAME: gorillabooks-production
   # Optional: Set these to enable custom domain with HTTPS
-  DOMAIN_NAME: ''  # e.g., gorillabooks.net
-  HOSTED_ZONE_ID: ''  # e.g., Z1234567890ABC
+  DOMAIN_NAME: ${{ vars.DOMAIN_NAME || '' }}
+  HOSTED_ZONE_ID: ${{ vars.HOSTED_ZONE_ID || '' }}
 
 permissions:
   id-token: write
