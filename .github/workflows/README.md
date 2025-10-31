@@ -72,7 +72,15 @@ env:
 
 ### Required GitHub Secrets
 
+**Required:**
 - `AWS_ROLE_ARN` - IAM role ARN for OIDC authentication (see `infrastructure/GITHUB_OIDC_SETUP.md`)
+  - Example: `arn:aws:iam::123456789012:role/GitHubActionsRole`
+  - Set in: Repository Settings → Secrets and variables → Actions → Secrets
+
+**Optional Repository Variables:**
+- `AWS_REGION` - AWS region to deploy to (defaults to `us-west-2` if not set)
+  - Example: `us-west-2`
+  - Set in: Repository Settings → Secrets and variables → Actions → Variables
 
 ### Optional: Custom Domain
 

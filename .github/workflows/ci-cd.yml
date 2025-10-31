@@ -8,7 +8,8 @@ on:
   workflow_dispatch:
 
 env:
-  AWS_REGION: us-west-2
+  # AWS_REGION can be set here or as a repository variable
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-west-2' }}
   STACK_NAME: gorillabooks-production
   # Optional: Set these to enable custom domain with HTTPS
   DOMAIN_NAME: ''  # e.g., gorillabooks.net
@@ -87,7 +88,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Deploy CloudFormation Stack
@@ -143,7 +144,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to Amazon ECR
