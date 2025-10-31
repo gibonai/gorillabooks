@@ -517,7 +517,8 @@ Resources:
   # ECS Services
   BackendService:
     Type: AWS::ECS::Service
-    DependsOn: ALBListenerRule
+    DependsOn:
+      - ALBListenerHTTP
     Properties:
       ServiceName: !Sub '${AppName}-${Environment}-backend'
       Cluster: !Ref ECSCluster
