@@ -68,6 +68,36 @@
 
 See `infrastructure/GITHUB_OIDC_SETUP.md` for detailed setup instructions.
 
+## CloudFormation Stack Issues
+
+### Error: Stack in ROLLBACK_COMPLETE state
+
+**Cause:** A previous deployment failed and CloudFormation rolled back all changes.
+
+**Solution:** Delete the failed stack before redeploying:
+
+```bash
+# Delete the failed stack
+aws cloudformation delete-stack \
+  --stack-name gorillabooks-production \
+  --region us-west-2
+
+# Wait for deletion to complete
+aws cloudformation wait stack-delete-complete \
+  --stack-name gorillabooks-production \
+  --region us-west-2
+
+# Then re-run your deployment
+```
+
+### Error: Target group name too long
+
+**Cause:** AWS has a 32-character limit for target group names.
+
+**Solution:** Already fixed in the template. Target groups now use shortened names:
+- `gorillabooks-production-be-tg` (backend)
+- `gorillabooks-production-fe-tg` (frontend)
+
 ## Common GitHub Actions Issues
 
 ### Workflow not running on push to main

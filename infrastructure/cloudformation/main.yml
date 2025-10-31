@@ -317,7 +317,7 @@ Resources:
   BackendTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
-      Name: !Sub '${AppName}-${Environment}-backend-tg'
+      Name: !Sub '${AppName}-${Environment}-be-tg'
       Port: 3000
       Protocol: HTTP
       VpcId: !Ref VPC
@@ -331,7 +331,7 @@ Resources:
   FrontendTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
-      Name: !Sub '${AppName}-${Environment}-frontend-tg'
+      Name: !Sub '${AppName}-${Environment}-fe-tg'
       Port: 80
       Protocol: HTTP
       VpcId: !Ref VPC

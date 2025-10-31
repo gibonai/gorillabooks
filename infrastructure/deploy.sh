@@ -47,6 +47,8 @@ if [ -n "$HOSTED_ZONE_ID" ]; then
     PARAMS="$PARAMS HostedZoneId=$HOSTED_ZONE_ID"
 fi
 
+# Deploy with error handling
+set +e
 aws cloudformation deploy \
     --template-file cloudformation/main.yml \
     --stack-name $STACK_NAME \
@@ -54,6 +56,22 @@ aws cloudformation deploy \
     --capabilities CAPABILITY_IAM \
     --region $AWS_REGION \
     --no-fail-on-empty-changeset
+DEPLOY_EXIT_CODE=$?
+set -e
+
+if [ $DEPLOY_EXIT_CODE -ne 0 ]; then
+    echo ""
+    echo "❌ CloudFormation deployment failed!"
+    echo ""
+    echo "Recent error events:"
+    aws cloudformation describe-stack-events \
+        --stack-name $STACK_NAME \
+        --region $AWS_REGION \
+        --max-items 30 \
+        --query 'StackEvents[?contains(ResourceStatus, `FAILED`)].[Timestamp,LogicalResourceId,ResourceStatus,ResourceStatusReason]' \
+        --output table
+    exit $DEPLOY_EXIT_CODE
+fi
 
 echo ""
 echo "✅ Infrastructure deployed successfully!"

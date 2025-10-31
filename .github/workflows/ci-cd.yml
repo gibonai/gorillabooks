@@ -105,12 +105,27 @@ jobs:
             PARAMS="$PARAMS HostedZoneId=${{ env.HOSTED_ZONE_ID }}"
           fi
 
+          # Deploy and capture exit code
+          set +e
           aws cloudformation deploy \
             --template-file infrastructure/cloudformation/main.yml \
             --stack-name ${{ env.STACK_NAME }} \
             --parameter-overrides $PARAMS \
             --capabilities CAPABILITY_IAM \
             --no-fail-on-empty-changeset
+          EXIT_CODE=$?
+          set -e
+
+          # If deployment failed, show the error events
+          if [ $EXIT_CODE -ne 0 ]; then
+            echo "❌ CloudFormation deployment failed. Recent events:"
+            aws cloudformation describe-stack-events \
+              --stack-name ${{ env.STACK_NAME }} \
+              --max-items 20 \
+              --query 'StackEvents[?ResourceStatus==`CREATE_FAILED` || ResourceStatus==`UPDATE_FAILED` || ResourceStatus==`DELETE_FAILED`].[LogicalResourceId,ResourceStatus,ResourceStatusReason]' \
+              --output table
+            exit $EXIT_CODE
+          fi
 
       - name: Get Stack Outputs
         id: stack-outputs
