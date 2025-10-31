@@ -50,7 +50,7 @@ describe('Auth Controller', () => {
       };
 
       (User.findOne as jest.Mock).mockResolvedValue(null);
-      (User as any).mockImplementation(() => mockUser);
+      (User as unknown as jest.Mock).mockImplementation(() => mockUser);
       (jwt.sign as jest.Mock).mockReturnValue('mock-token');
 
       await signup(mockRequest as Request, mockResponse as Response);
@@ -291,7 +291,7 @@ describe('Auth Controller', () => {
         name: 'Test User',
       };
 
-      (mockRequest as any).userId = 'user123';
+      (mockRequest as { userId?: string }).userId = 'user123';
       (User.findById as jest.Mock).mockResolvedValue(mockUser);
 
       await getMe(mockRequest as Request, mockResponse as Response);
@@ -305,7 +305,7 @@ describe('Auth Controller', () => {
     });
 
     it('should return 404 if user not found', async () => {
-      (mockRequest as any).userId = 'nonexistent';
+      (mockRequest as { userId?: string }).userId = 'nonexistent';
       (User.findById as jest.Mock).mockResolvedValue(null);
 
       await getMe(mockRequest as Request, mockResponse as Response);
@@ -317,7 +317,7 @@ describe('Auth Controller', () => {
     });
 
     it('should return 500 on database error', async () => {
-      (mockRequest as any).userId = 'user123';
+      (mockRequest as { userId?: string }).userId = 'user123';
       (User.findById as jest.Mock).mockRejectedValue(new Error('Database error'));
 
       await getMe(mockRequest as Request, mockResponse as Response);

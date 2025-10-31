@@ -49,11 +49,11 @@ export const createTransaction = async (
     await transaction.save();
 
     res.status(201).json(transaction);
-  } catch (error: any) {
+  } catch (error) {
     console.error('Create transaction error:', error);
 
     // Handle validation errors
-    if (error.name === 'ValidationError') {
+    if (error instanceof Error && error.name === 'ValidationError') {
       res.status(400).json({ error: error.message });
       return;
     }

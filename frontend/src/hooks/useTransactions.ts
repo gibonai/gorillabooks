@@ -13,8 +13,9 @@ export function useTransactions() {
       const response = await api.get<Transaction[]>('/transactions');
       setTransactions(response.data);
       setError(null);
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to fetch transactions');
+    } catch (err) {
+      const message = (err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Failed to fetch transactions';
+      setError(message);
     } finally {
       setIsLoading(false);
     }
@@ -29,8 +30,9 @@ export function useTransactions() {
       const response = await api.post<Transaction>('/transactions', transaction);
       setTransactions([response.data, ...transactions]);
       return response.data;
-    } catch (err: any) {
-      throw new Error(err.response?.data?.error || 'Failed to create transaction');
+    } catch (err) {
+      const message = (err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Failed to create transaction';
+      throw new Error(message);
     }
   };
 
@@ -38,8 +40,9 @@ export function useTransactions() {
     try {
       await api.delete(`/transactions/${id}`);
       setTransactions(transactions.filter(t => t._id !== id));
-    } catch (err: any) {
-      throw new Error(err.response?.data?.error || 'Failed to delete transaction');
+    } catch (err) {
+      const message = (err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Failed to delete transaction';
+      throw new Error(message);
     }
   };
 

@@ -11,7 +11,7 @@ describe('User Model', () => {
     // actually saving to a database
 
     it('should have a pre-save hook for password hashing', () => {
-      const preSaveHooks = User.schema.pre as any;
+      const preSaveHooks = User.schema.pre as unknown;
       expect(preSaveHooks).toBeDefined();
     });
   });

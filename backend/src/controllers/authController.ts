@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { User } from '../models/User';
 import { config } from '../config/env';
+import { AuthRequest } from '../middleware/auth';
 
 export const signup = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -93,7 +94,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 
 export const getMe = async (req: Request, res: Response): Promise<void> => {
   try {
-    const userId = (req as any).userId;
+    const userId = (req as AuthRequest).userId;
     const user = await User.findById(userId);
 
     if (!user) {

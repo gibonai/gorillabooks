@@ -45,8 +45,9 @@ function DashboardPage() {
       await createTransaction(transaction);
       toast.success('Transaction saved successfully!');
       setShowNewTransactionForm(false); // Close form after successful save
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to save transaction');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to save transaction';
+      toast.error(message);
       throw error;
     }
   };
@@ -55,8 +56,9 @@ function DashboardPage() {
     try {
       await deleteTransaction(id);
       toast.success('Transaction deleted successfully!');
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to delete transaction');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to delete transaction';
+      toast.error(message);
       throw error;
     }
   };

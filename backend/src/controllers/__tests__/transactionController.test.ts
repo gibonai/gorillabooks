@@ -51,7 +51,7 @@ describe('Transaction Controller', () => {
       };
 
       mockRequest.body = mockTransactionData;
-      (Transaction as any).mockImplementation(() => savedTransaction);
+      (Transaction as unknown as jest.Mock).mockImplementation(() => savedTransaction);
 
       await createTransaction(mockRequest as AuthRequest, mockResponse as Response);
 
@@ -154,7 +154,7 @@ describe('Transaction Controller', () => {
       const validationError = new Error('Validation failed');
       validationError.name = 'ValidationError';
 
-      (Transaction as any).mockImplementation(() => ({
+      (Transaction as unknown as jest.Mock).mockImplementation(() => ({
         save: jest.fn().mockRejectedValue(validationError),
       }));
 
@@ -173,7 +173,7 @@ describe('Transaction Controller', () => {
         description: 'Test',
       };
 
-      (Transaction as any).mockImplementation(() => ({
+      (Transaction as unknown as jest.Mock).mockImplementation(() => ({
         save: jest.fn().mockRejectedValue(new Error('Database error')),
       }));
 

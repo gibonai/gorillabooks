@@ -60,7 +60,7 @@ describe('Transaction Model', () => {
       const transaction = new Transaction({
         userId: new mongoose.Types.ObjectId(),
         date: new Date(),
-        type: 'invalid' as any,
+        type: 'invalid' as 'income' | 'expense',
         amount: 100,
         category: 'Test',
         description: 'Test',
@@ -322,7 +322,7 @@ describe('Transaction Model', () => {
 
     it('should have index on userId field', () => {
       const userIdField = Transaction.schema.path('userId');
-      expect((userIdField as any).options.index).toBe(true);
+      expect((userIdField as unknown as { options: { index: boolean } }).options.index).toBe(true);
     });
   });
 });
