@@ -136,7 +136,12 @@ gorillabooks/
 │   └── Dockerfile.dev    # Development build
 │
 ├── .github/
-│   └── workflows/        # CI/CD pipelines
+│   └── workflows/
+│       └── ci-cd.yml     # Combined CI/CD pipeline
+├── infrastructure/       # CloudFormation & deployment
+│   ├── cloudformation/
+│   │   └── main.yml      # Infrastructure as Code
+│   └── deploy.sh         # Manual deployment script
 ├── docker-compose.yml    # Local development setup
 └── package.json          # Workspace configuration
 ```
@@ -216,28 +221,41 @@ Authorization: Bearer <token>
 
 ## Deployment
 
-### AWS Deployment
+### AWS Deployment with CloudFormation
 
-1. **Set up DocumentDB cluster**
-   ```bash
-   aws docdb create-db-cluster \
-     --db-cluster-identifier gorillabooks-cluster \
-     --engine docdb \
-     --master-username admin \
-     --master-user-password <password>
-   ```
+This project uses a fully automated AWS deployment via CloudFormation.
 
-2. **Create ECR repositories**
-   ```bash
-   aws ecr create-repository --repository-name gorillabooks-backend
-   aws ecr create-repository --repository-name gorillabooks-frontend
-   ```
+1. **Set up GitHub OIDC** (see `infrastructure/GITHUB_OIDC_SETUP.md`)
+   - Configure AWS IAM OIDC provider for GitHub
+   - Create IAM role with permissions for CloudFormation, ECS, ECR, etc.
 
-3. **Configure GitHub Secrets**
-   - `AWS_ACCESS_KEY_ID`
-   - `AWS_SECRET_ACCESS_KEY`
+2. **Configure GitHub Secret**
+   - `AWS_ROLE_ARN` - The ARN of your IAM role for OIDC authentication
 
-4. **Push to main branch** - GitHub Actions will automatically build and deploy
+3. **Optional: Configure Custom Domain** (see `infrastructure/DOMAIN_SETUP.md`)
+   - Set `DOMAIN_NAME` and `HOSTED_ZONE_ID` in `.github/workflows/ci-cd.yml`
+   - Enables automatic HTTPS with ACM certificates
+
+4. **Push to main branch** - GitHub Actions will automatically:
+   - ✅ Lint and test both backend and frontend
+   - 🏗️ Deploy CloudFormation infrastructure
+   - 🐳 Build and push Docker images to ECR
+   - 🚀 Deploy to ECS with automatic rollout
+
+### Manual Deployment
+
+You can also deploy manually using the provided script:
+
+```bash
+cd infrastructure
+export AWS_REGION=us-west-2
+export ENVIRONMENT=production
+export DOMAIN_NAME=gorillabooks.net  # Optional
+export HOSTED_ZONE_ID=Z1234567890ABC  # Optional
+./deploy.sh
+```
+
+See `infrastructure/SECRETS_MANAGEMENT.md` for information about auto-generated secrets.
 
 ### Environment Variables (Production)
 
