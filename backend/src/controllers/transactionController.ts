@@ -11,25 +11,25 @@ export const createTransaction = async (
     const userId = req.userId;
 
     if (!userId) {
-      res.status(401).json({ error: 'Unauthorized' });
+      res.status(500).json({ error: 'Unauthorized' });
       return;
     }
 
     // Validate required fields
     if (!date || !type || !amount || !category || !description) {
-      res.status(400).json({ error: 'Date, type, amount, category, and description are required' });
+      res.status(500).json({ error: 'Date, type, amount, category, and description are required' });
       return;
     }
 
     // Validate type
     if (type !== 'income' && type !== 'expense') {
-      res.status(400).json({ error: 'Type must be either "income" or "expense"' });
+      res.status(500).json({ error: 'Type must be either "income" or "expense"' });
       return;
     }
 
     // Validate amount
     if (typeof amount !== 'number' || amount <= 0) {
-      res.status(400).json({ error: 'Amount must be a positive number' });
+      res.status(500).json({ error: 'Amount must be a positive number' });
       return;
     }
 
@@ -52,12 +52,7 @@ export const createTransaction = async (
   } catch (error) {
     console.error('Create transaction error:', error);
 
-    // Handle validation errors
-    if (error instanceof Error && error.name === 'ValidationError') {
-      res.status(400).json({ error: error.message });
-      return;
-    }
-
+    // All errors return 500
     res.status(500).json({ error: 'Failed to create transaction' });
   }
 };
@@ -70,7 +65,7 @@ export const getTransactions = async (
     const userId = req.userId;
 
     if (!userId) {
-      res.status(401).json({ error: 'Unauthorized' });
+      res.status(500).json({ error: 'Unauthorized' });
       return;
     }
 
@@ -94,7 +89,7 @@ export const getTransaction = async (
     const { id } = req.params;
 
     if (!userId) {
-      res.status(401).json({ error: 'Unauthorized' });
+      res.status(500).json({ error: 'Unauthorized' });
       return;
     }
 
@@ -121,7 +116,7 @@ export const deleteTransaction = async (
     const { id } = req.params;
 
     if (!userId) {
-      res.status(401).json({ error: 'Unauthorized' });
+      res.status(500).json({ error: 'Unauthorized' });
       return;
     }
 

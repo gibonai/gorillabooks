@@ -10,19 +10,19 @@ export const signup = async (req: Request, res: Response): Promise<void> => {
 
     // Validate input
     if (!email || !password || !name) {
-      res.status(400).json({ error: 'Email, password, and name are required' });
+      res.status(500).json({ error: 'Email, password, and name are required' });
       return;
     }
 
     if (password.length < 8) {
-      res.status(400).json({ error: 'Password must be at least 8 characters long' });
+      res.status(500).json({ error: 'Password must be at least 8 characters long' });
       return;
     }
 
     // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      res.status(409).json({ error: 'User already exists with this email' });
+      res.status(500).json({ error: 'User already exists with this email' });
       return;
     }
 
@@ -55,21 +55,21 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 
     // Validate input
     if (!email || !password) {
-      res.status(400).json({ error: 'Email and password are required' });
+      res.status(500).json({ error: 'Email and password are required' });
       return;
     }
 
     // Find user
     const user = await User.findOne({ email });
     if (!user) {
-      res.status(401).json({ error: 'Invalid email or password' });
+      res.status(500).json({ error: 'Invalid email or password' });
       return;
     }
 
     // Check password
     const isPasswordValid = await user.comparePassword(password);
     if (!isPasswordValid) {
-      res.status(401).json({ error: 'Invalid email or password' });
+      res.status(500).json({ error: 'Invalid email or password' });
       return;
     }
 
