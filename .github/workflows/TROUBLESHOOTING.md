@@ -98,6 +98,14 @@ aws cloudformation wait stack-delete-complete \
 - `gorillabooks-production-be-tg` (backend)
 - `gorillabooks-production-fe-tg` (frontend)
 
+### Error: MongoDBSubnetGroup - "Internal Failure"
+
+**Cause:** DocumentDB requires subnet groups to span at least 2 different Availability Zones.
+
+**Solution:** Already fixed in the template. Now creates 2 private subnets:
+- `PrivateSubnet1` in AZ 0 (10.0.3.0/24)
+- `PrivateSubnet2` in AZ 1 (10.0.4.0/24)
+
 ## Common GitHub Actions Issues
 
 ### Workflow not running on push to main
