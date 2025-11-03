@@ -143,11 +143,11 @@ export class CdkStack extends cdk.Stack {
           PORT: '3000',
         },
         secrets: {
-          // MongoDB connection string with credentials
-          MONGODB_URI: ecs.Secret.fromSecretsManager(
-            dbCluster.secret!,
-            'uri'
-          ),
+          // DocumentDB connection details (construct URI in app)
+          DB_HOST: ecs.Secret.fromSecretsManager(dbCluster.secret!, 'host'),
+          DB_PORT: ecs.Secret.fromSecretsManager(dbCluster.secret!, 'port'),
+          DB_USERNAME: ecs.Secret.fromSecretsManager(dbCluster.secret!, 'username'),
+          DB_PASSWORD: ecs.Secret.fromSecretsManager(dbCluster.secret!, 'password'),
           // JWT secret
           JWT_SECRET: ecs.Secret.fromSecretsManager(jwtSecret, 'secret'),
         },

@@ -2,20 +2,32 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+// Construct MongoDB URI from individual env vars or use MONGODB_URI directly
+const getMongodbUri = (): string => {
+  // If MONGODB_URI is provided directly, use it
+  if (process.env.MONGODB_URI) {
+    return process.env.MONGODB_URI;
+  }
+
+  // Otherwise construct from individual components (used in AWS ECS)
+  const { DB_HOST, DB_PORT, DB_USERNAME, DB_PASSWORD } = process.env;
+  if (DB_HOST && DB_PORT && DB_USERNAME && DB_PASSWORD) {
+    return `mongodb://${DB_USERNAME}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/?tls=true&tlsCAFile=global-bundle.pem&replicaSet=rs0&readPreference=secondaryPreferred&retryWrites=false`;
+  }
+
+  return '';
+};
+
 export const config = {
   port: process.env.PORT || 3000,
   nodeEnv: process.env.NODE_ENV || 'development',
-  mongodbUri: process.env.MONGODB_URI || '',
+  mongodbUri: getMongodbUri(),
   jwtSecret: process.env.JWT_SECRET || 'default-secret-change-in-production',
   jwtExpiresIn: '7d',
 } as const;
 
 // Validate required environment variables
-const requiredEnvVars = ['MONGODB_URI'];
-
-for (const envVar of requiredEnvVars) {
-  if (!process.env[envVar]) {
-    console.error(`Missing required environment variable: ${envVar}`);
-    process.exit(1);
-  }
+if (!config.mongodbUri) {
+  console.error('Missing MongoDB configuration. Provide either MONGODB_URI or DB_HOST/DB_PORT/DB_USERNAME/DB_PASSWORD');
+  process.exit(1);
 }
