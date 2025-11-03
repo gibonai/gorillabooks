@@ -123,17 +123,53 @@ jobs:
           CONTEXT="$CONTEXT -c environment=${{ env.ENVIRONMENT }}"
 
           # Deploy with CDK
+          # Note: DocumentDB provisioning can take >1 hour, which may exceed GitHub token lifetime
+          # If deployment times out, check CloudFormation console - stack may complete successfully
+          set +e
           npx cdk deploy $CONTEXT \
             --require-approval never \
             --outputs-file outputs.json
+          EXIT_CODE=$?
+          set -e
+
+          # If CDK failed, check if it's just a token expiry issue
+          if [ $EXIT_CODE -ne 0 ]; then
+            echo "⚠️  CDK deployment command failed (exit code: $EXIT_CODE)"
+            echo "This may be due to GitHub token expiration during long DocumentDB provisioning"
+            echo "Checking CloudFormation stack status..."
+
+            STACK_STATUS=$(aws cloudformation describe-stacks \
+              --stack-name CdkStack \
+              --region ${{ env.AWS_REGION }} \
+              --query 'Stacks[0].StackStatus' \
+              --output text 2>/dev/null || echo "NOT_FOUND")
+
+            echo "Stack status: $STACK_STATUS"
+
+            if [[ "$STACK_STATUS" == "CREATE_COMPLETE" || "$STACK_STATUS" == "UPDATE_COMPLETE" ]]; then
+              echo "✅ Stack deployment completed successfully despite token expiration"
+              # Regenerate outputs file
+              aws cloudformation describe-stacks \
+                --stack-name CdkStack \
+                --region ${{ env.AWS_REGION }} \
+                --query 'Stacks[0].Outputs' > stack-outputs-raw.json
+              # Convert to CDK outputs format
+              echo '{"CdkStack":{}}' > outputs.json
+              jq -r '.[] | {(.OutputKey): .OutputValue}' stack-outputs-raw.json | \
+                jq -s 'add | {"CdkStack": .}' > outputs.json
+            else
+              echo "❌ Stack deployment failed with status: $STACK_STATUS"
+              exit 1
+            fi
+          fi
 
       - name: Get Stack Outputs
         id: stack-outputs
         working-directory: ./infrastructure/cdk
         run: |
-          REPOSITORY_URI=$(cat outputs.json | jq -r '.CdkStack.RepositoryUri')
-          CLUSTER_NAME=$(cat outputs.json | jq -r '.CdkStack.ClusterName')
-          SERVICE_NAME=$(cat outputs.json | jq -r '.CdkStack.ServiceName')
+          REPOSITORY_URI=$(jq -r '.CdkStack.RepositoryUri' outputs.json)
+          CLUSTER_NAME=$(jq -r '.CdkStack.ClusterName' outputs.json)
+          SERVICE_NAME=$(jq -r '.CdkStack.ServiceName' outputs.json)
 
           echo "repository-uri=$REPOSITORY_URI" >> $GITHUB_OUTPUT
           echo "cluster-name=$CLUSTER_NAME" >> $GITHUB_OUTPUT
@@ -169,11 +205,12 @@ jobs:
           docker tag $ECR_REPOSITORY:$IMAGE_TAG $ECR_REPOSITORY:latest
           docker push $ECR_REPOSITORY:latest
 
-      - name: Force ECS service update
+      - name: Update ECS service with new image
         env:
           CLUSTER_NAME: ${{ needs.deploy-infrastructure.outputs.cluster-name }}
           SERVICE_NAME: ${{ needs.deploy-infrastructure.outputs.service-name }}
         run: |
+          # Force new deployment with the latest image
           aws ecs update-service \
             --cluster $CLUSTER_NAME \
             --service $SERVICE_NAME \

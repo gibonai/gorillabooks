@@ -170,6 +170,7 @@ export class CdkStack extends cdk.Stack {
       }),
       publicLoadBalancer: true,
       assignPublicIp: true, // Tasks in public subnets (no NAT gateway needed)
+      circuitBreaker: { rollback: true }, // Enable circuit breaker for faster failure detection
     });
 
     // Allow ECS tasks to connect to DocumentDB
@@ -184,7 +185,7 @@ export class CdkStack extends cdk.Stack {
       interval: cdk.Duration.seconds(30),
       timeout: cdk.Duration.seconds(5),
       healthyThresholdCount: 2,
-      unhealthyThresholdCount: 3,
+      unhealthyThresholdCount: 10, // Allow more retries during initial image pull
     });
 
     // Outputs
