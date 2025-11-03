@@ -61,18 +61,12 @@ export class CdkStack extends cdk.Stack {
       ],
     });
 
-    // ECR Repository for the consolidated app image
-    const repository = new ecr.Repository(this, 'AppRepository', {
-      repositoryName: `${appName}-app`,
-      imageScanOnPush: true,
-      lifecycleRules: [
-        {
-          description: 'Keep last 10 images',
-          maxImageCount: 10,
-        },
-      ],
-      removalPolicy: cdk.RemovalPolicy.DESTROY, // For dev/testing
-    });
+    // Reference existing ECR Repository (created by workflow before stack deployment)
+    const repository = ecr.Repository.fromRepositoryName(
+      this,
+      'AppRepository',
+      `${appName}-app`
+    );
 
     // JWT Secret - auto-generated
     const jwtSecret = new secretsmanager.Secret(this, 'JWTSecret', {

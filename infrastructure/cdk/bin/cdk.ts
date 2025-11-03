@@ -10,7 +10,7 @@ const hostedZoneId = app.node.tryGetContext('hostedZoneId');
 const environment = app.node.tryGetContext('environment') || 'production';
 const appName = app.node.tryGetContext('appName') || 'gorillabooks';
 
-new CdkStack(app, 'CdkStack', {
+new CdkStack(app, 'GorillaBooks', {
   env: {
     account: process.env.CDK_DEFAULT_ACCOUNT,
     region: process.env.CDK_DEFAULT_REGION

@@ -107,13 +107,18 @@ jobs:
         run: |
           npx cdk bootstrap aws://unknown-account/${{ env.AWS_REGION }} || true
 
-      - name: Ensure ECR repository exists and has placeholder image
-        working-directory: ./infrastructure/cdk
+      - name: Ensure ECR repository exists with placeholder image
         run: |
-          # Create ECR repository if it doesn't exist
           REPO_NAME="gorillabooks-app"
-          aws ecr describe-repositories --repository-names $REPO_NAME --region ${{ env.AWS_REGION }} 2>/dev/null || \
-            aws ecr create-repository --repository-name $REPO_NAME --region ${{ env.AWS_REGION }}
+
+          # Create ECR repository if it doesn't exist
+          if ! aws ecr describe-repositories --repository-names $REPO_NAME --region ${{ env.AWS_REGION }} 2>/dev/null; then
+            echo "📦 Creating ECR repository..."
+            aws ecr create-repository \
+              --repository-name $REPO_NAME \
+              --region ${{ env.AWS_REGION }} \
+              --image-scanning-configuration scanOnPush=true
+          fi
 
           # Check if 'latest' tag exists
           IMAGE_EXISTS=$(aws ecr describe-images \
@@ -124,18 +129,18 @@ jobs:
             --output text 2>/dev/null || echo "")
 
           if [ -z "$IMAGE_EXISTS" ]; then
-            echo "📦 No 'latest' image found. Pushing placeholder image..."
+            echo "📦 Pushing placeholder image..."
             # Login to ECR
             aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
               docker login --username AWS --password-stdin \
               $(aws sts get-caller-identity --query Account --output text).dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
 
-            # Pull a small public image and tag it
+            # Pull and push placeholder image
             docker pull public.ecr.aws/docker/library/nginx:alpine
             REPO_URI=$(aws ecr describe-repositories --repository-names $REPO_NAME --region ${{ env.AWS_REGION }} --query 'repositories[0].repositoryUri' --output text)
             docker tag public.ecr.aws/docker/library/nginx:alpine $REPO_URI:latest
             docker push $REPO_URI:latest
-            echo "✅ Placeholder image pushed"
+            echo "✅ Placeholder image ready for CDK deployment"
           else
             echo "✅ Image with 'latest' tag already exists"
           fi
@@ -172,7 +177,7 @@ jobs:
             echo "Checking CloudFormation stack status..."
 
             STACK_STATUS=$(aws cloudformation describe-stacks \
-              --stack-name CdkStack \
+              --stack-name GorillaBooks \
               --region ${{ env.AWS_REGION }} \
               --query 'Stacks[0].StackStatus' \
               --output text 2>/dev/null || echo "NOT_FOUND")
@@ -183,13 +188,13 @@ jobs:
               echo "✅ Stack deployment completed successfully despite token expiration"
               # Regenerate outputs file
               aws cloudformation describe-stacks \
-                --stack-name CdkStack \
+                --stack-name GorillaBooks \
                 --region ${{ env.AWS_REGION }} \
                 --query 'Stacks[0].Outputs' > stack-outputs-raw.json
               # Convert to CDK outputs format
-              echo '{"CdkStack":{}}' > outputs.json
+              echo '{"GorillaBooks":{}}' > outputs.json
               jq -r '.[] | {(.OutputKey): .OutputValue}' stack-outputs-raw.json | \
-                jq -s 'add | {"CdkStack": .}' > outputs.json
+                jq -s 'add | {"GorillaBooks": .}' > outputs.json
             else
               echo "❌ Stack deployment failed with status: $STACK_STATUS"
               exit 1
@@ -200,9 +205,9 @@ jobs:
         id: stack-outputs
         working-directory: ./infrastructure/cdk
         run: |
-          REPOSITORY_URI=$(jq -r '.CdkStack.RepositoryUri' outputs.json)
-          CLUSTER_NAME=$(jq -r '.CdkStack.ClusterName' outputs.json)
-          SERVICE_NAME=$(jq -r '.CdkStack.ServiceName' outputs.json)
+          REPOSITORY_URI=$(jq -r '.GorillaBooks.RepositoryUri' outputs.json)
+          CLUSTER_NAME=$(jq -r '.GorillaBooks.ClusterName' outputs.json)
+          SERVICE_NAME=$(jq -r '.GorillaBooks.ServiceName' outputs.json)
 
           echo "repository-uri=$REPOSITORY_URI" >> $GITHUB_OUTPUT
           echo "cluster-name=$CLUSTER_NAME" >> $GITHUB_OUTPUT
@@ -262,6 +267,6 @@ jobs:
       - name: Get Application URL
         working-directory: ./infrastructure/cdk
         run: |
-          ALB_URL=$(cat outputs.json | jq -r '.CdkStack.LoadBalancerURL')
+          ALB_URL=$(cat outputs.json | jq -r '.GorillaBooks.LoadBalancerURL')
           echo "🚀 Application deployed successfully!"
           echo "📍 Access your app at: $ALB_URL"
