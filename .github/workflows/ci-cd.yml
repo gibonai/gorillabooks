@@ -107,6 +107,39 @@ jobs:
         run: |
           npx cdk bootstrap aws://unknown-account/${{ env.AWS_REGION }} || true
 
+      - name: Ensure ECR repository exists and has placeholder image
+        working-directory: ./infrastructure/cdk
+        run: |
+          # Create ECR repository if it doesn't exist
+          REPO_NAME="gorillabooks-app"
+          aws ecr describe-repositories --repository-names $REPO_NAME --region ${{ env.AWS_REGION }} 2>/dev/null || \
+            aws ecr create-repository --repository-name $REPO_NAME --region ${{ env.AWS_REGION }}
+
+          # Check if 'latest' tag exists
+          IMAGE_EXISTS=$(aws ecr describe-images \
+            --repository-name $REPO_NAME \
+            --region ${{ env.AWS_REGION }} \
+            --image-ids imageTag=latest \
+            --query 'imageDetails[0].imageTags' \
+            --output text 2>/dev/null || echo "")
+
+          if [ -z "$IMAGE_EXISTS" ]; then
+            echo "📦 No 'latest' image found. Pushing placeholder image..."
+            # Login to ECR
+            aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
+              docker login --username AWS --password-stdin \
+              $(aws sts get-caller-identity --query Account --output text).dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
+
+            # Pull a small public image and tag it
+            docker pull public.ecr.aws/docker/library/nginx:alpine
+            REPO_URI=$(aws ecr describe-repositories --repository-names $REPO_NAME --region ${{ env.AWS_REGION }} --query 'repositories[0].repositoryUri' --output text)
+            docker tag public.ecr.aws/docker/library/nginx:alpine $REPO_URI:latest
+            docker push $REPO_URI:latest
+            echo "✅ Placeholder image pushed"
+          else
+            echo "✅ Image with 'latest' tag already exists"
+          fi
+
       - name: Deploy CDK Stack
         working-directory: ./infrastructure/cdk
         run: |

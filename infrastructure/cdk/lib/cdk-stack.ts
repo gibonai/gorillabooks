@@ -170,7 +170,6 @@ export class CdkStack extends cdk.Stack {
       }),
       publicLoadBalancer: true,
       assignPublicIp: true, // Tasks in public subnets (no NAT gateway needed)
-      circuitBreaker: { rollback: true }, // Enable circuit breaker for faster failure detection
     });
 
     // Allow ECS tasks to connect to DocumentDB
