@@ -12,7 +12,10 @@ const getMongodbUri = (): string => {
   // Otherwise construct from individual components (used in AWS ECS)
   const { DB_HOST, DB_PORT, DB_USERNAME, DB_PASSWORD } = process.env;
   if (DB_HOST && DB_PORT && DB_USERNAME && DB_PASSWORD) {
-    return `mongodb://${DB_USERNAME}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/?tls=true&replicaSet=rs0&readPreference=secondaryPreferred&retryWrites=false`;
+    // URL-encode username and password to handle special characters
+    const encodedUsername = encodeURIComponent(DB_USERNAME);
+    const encodedPassword = encodeURIComponent(DB_PASSWORD);
+    return `mongodb://${encodedUsername}:${encodedPassword}@${DB_HOST}:${DB_PORT}/?tls=true&replicaSet=rs0&readPreference=secondaryPreferred&retryWrites=false`;
   }
 
   return '';
