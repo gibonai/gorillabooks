@@ -2,6 +2,7 @@ import * as cdk from 'aws-cdk-lib';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as ecs from 'aws-cdk-lib/aws-ecs';
 import * as ecs_patterns from 'aws-cdk-lib/aws-ecs-patterns';
+import * as elbv2 from 'aws-cdk-lib/aws-elasticloadbalancingv2';
 import * as ecr from 'aws-cdk-lib/aws-ecr';
 import * as docdb from 'aws-cdk-lib/aws-docdb';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
@@ -92,7 +93,7 @@ export class CdkStack extends cdk.Stack {
       instances: 1,
       vpc,
       vpcSubnets: {
-        subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
+        subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
       },
       backup: {
         retention: cdk.Duration.days(1),
@@ -183,6 +184,16 @@ export class CdkStack extends cdk.Stack {
       healthyThresholdCount: 2,
       unhealthyThresholdCount: 10, // Allow more retries during initial image pull
     });
+
+    // Add HTTP → HTTPS redirect if using custom domain with certificate
+    if (certificate) {
+      service.loadBalancer.addRedirect({
+        sourceProtocol: elbv2.ApplicationProtocol.HTTP,
+        sourcePort: 80,
+        targetProtocol: elbv2.ApplicationProtocol.HTTPS,
+        targetPort: 443,
+      });
+    }
 
     // Outputs
     new cdk.CfnOutput(this, 'RepositoryUri', {
