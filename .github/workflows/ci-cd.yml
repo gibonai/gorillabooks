@@ -107,7 +107,7 @@ jobs:
         run: |
           npx cdk bootstrap aws://unknown-account/${{ env.AWS_REGION }} || true
 
-      - name: Ensure ECR repository exists with placeholder image
+      - name: Ensure ECR repository exists
         run: |
           REPO_NAME="gorillabooks-app"
 
@@ -120,30 +120,25 @@ jobs:
               --image-scanning-configuration scanOnPush=true
           fi
 
-          # Check if 'latest' tag exists
-          IMAGE_EXISTS=$(aws ecr describe-images \
-            --repository-name $REPO_NAME \
-            --region ${{ env.AWS_REGION }} \
-            --image-ids imageTag=latest \
-            --query 'imageDetails[0].imageTags' \
-            --output text 2>/dev/null || echo "")
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
 
-          if [ -z "$IMAGE_EXISTS" ]; then
-            echo "📦 Pushing placeholder image..."
-            # Login to ECR
-            aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
-              docker login --username AWS --password-stdin \
-              $(aws sts get-caller-identity --query Account --output text).dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
+      - name: Build and push application image
+        run: |
+          REPO_NAME="gorillabooks-app"
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          REPO_URI="${ACCOUNT_ID}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${REPO_NAME}"
+          IMAGE_TAG="${{ github.sha }}"
 
-            # Pull and push placeholder image
-            docker pull public.ecr.aws/docker/library/nginx:alpine
-            REPO_URI=$(aws ecr describe-repositories --repository-names $REPO_NAME --region ${{ env.AWS_REGION }} --query 'repositories[0].repositoryUri' --output text)
-            docker tag public.ecr.aws/docker/library/nginx:alpine $REPO_URI:latest
-            docker push $REPO_URI:latest
-            echo "✅ Placeholder image ready for CDK deployment"
-          else
-            echo "✅ Image with 'latest' tag already exists"
-          fi
+          echo "🔨 Building application image..."
+          docker build -t $REPO_URI:$IMAGE_TAG .
+          docker tag $REPO_URI:$IMAGE_TAG $REPO_URI:latest
+
+          echo "📤 Pushing to ECR..."
+          docker push $REPO_URI:$IMAGE_TAG
+          docker push $REPO_URI:latest
+          echo "✅ Application image ready for deployment"
 
       - name: Deploy CDK Stack
         working-directory: ./infrastructure/cdk
@@ -213,6 +208,13 @@ jobs:
           echo "cluster-name=$CLUSTER_NAME" >> $GITHUB_OUTPUT
           echo "service-name=$SERVICE_NAME" >> $GITHUB_OUTPUT
 
+      - name: Upload CDK outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: cdk-outputs
+          path: infrastructure/cdk/outputs.json
+          retention-days: 1
+
   deploy-application:
     name: Deploy Application
     runs-on: ubuntu-latest
@@ -223,27 +225,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Download CDK outputs
+        uses: actions/download-artifact@v4
+        with:
+          name: cdk-outputs
+          path: infrastructure/cdk
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ env.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Build, tag, and push consolidated image
-        env:
-          ECR_REPOSITORY: ${{ needs.deploy-infrastructure.outputs.repository-uri }}
-          IMAGE_TAG: ${{ github.sha }}
-        run: |
-          docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
-          docker push $ECR_REPOSITORY:$IMAGE_TAG
-          docker tag $ECR_REPOSITORY:$IMAGE_TAG $ECR_REPOSITORY:latest
-          docker push $ECR_REPOSITORY:latest
-
-      - name: Update ECS service with new image
+      - name: Force ECS service update
         env:
           CLUSTER_NAME: ${{ needs.deploy-infrastructure.outputs.cluster-name }}
           SERVICE_NAME: ${{ needs.deploy-infrastructure.outputs.service-name }}

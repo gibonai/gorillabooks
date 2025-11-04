@@ -170,6 +170,9 @@ export class CdkStack extends cdk.Stack {
       assignPublicIp: false, // No public IP needed - using NAT gateway
     });
 
+    // Add explicit dependency: ECS service must wait for DocumentDB to be fully ready
+    service.node.addDependency(dbCluster);
+
     // Allow ECS tasks to connect to DocumentDB
     dbCluster.connections.allowDefaultPortFrom(
       service.service,
