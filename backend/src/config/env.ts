@@ -12,7 +12,7 @@ const getMongodbUri = (): string => {
   // Otherwise construct from individual components (used in AWS ECS)
   const { DB_HOST, DB_PORT, DB_USERNAME, DB_PASSWORD } = process.env;
   if (DB_HOST && DB_PORT && DB_USERNAME && DB_PASSWORD) {
-    return `mongodb://${DB_USERNAME}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/?tls=true&tlsCAFile=global-bundle.pem&replicaSet=rs0&readPreference=secondaryPreferred&retryWrites=false`;
+    return `mongodb://${DB_USERNAME}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/?tls=true&replicaSet=rs0&readPreference=secondaryPreferred&retryWrites=false`;
   }
 
   return '';
