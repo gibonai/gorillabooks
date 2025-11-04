@@ -43,10 +43,10 @@ export class CdkStack extends cdk.Stack {
     const environment = props?.environment || 'production';
 
     // VPC with public and private subnets across 2 AZs
-    // This automatically creates proper subnetting for DocumentDB
+    // Private subnets have NAT gateway for outbound internet (ECR, Secrets Manager)
     const vpc = new ec2.Vpc(this, 'VPC', {
       maxAzs: 2,
-      natGateways: 0, // Cost optimization: no NAT gateways
+      natGateways: 1, // One NAT gateway for cost optimization (single point of failure but cheaper)
       subnetConfiguration: [
         {
           name: 'Public',
@@ -55,7 +55,7 @@ export class CdkStack extends cdk.Stack {
         },
         {
           name: 'Private',
-          subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
+          subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS, // NAT gateway for outbound
           cidrMask: 24,
         },
       ],
@@ -163,7 +163,10 @@ export class CdkStack extends cdk.Stack {
         domainZone,
       }),
       publicLoadBalancer: true,
-      assignPublicIp: true, // Tasks in public subnets (no NAT gateway needed)
+      taskSubnets: {
+        subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS, // Tasks in private subnets with DocumentDB
+      },
+      assignPublicIp: false, // No public IP needed - using NAT gateway
     });
 
     // Allow ECS tasks to connect to DocumentDB
