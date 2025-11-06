@@ -33,6 +33,12 @@ export interface GorillaBooksStackProps extends cdk.StackProps {
    * @default 'gorillabooks'
    */
   appName?: string;
+
+  /**
+   * Datadog secret name for API key
+   * @default 'datadog-api-key'
+   */
+  datadogSecretName?: string;
 }
 
 export class CdkStack extends cdk.Stack {
@@ -88,6 +94,15 @@ export class CdkStack extends cdk.Stack {
       'mongodb-atlas-gorillabooks'
     );
 
+    // Reference to Datadog API key secret
+    // Expected format: { "api-key": "..." }
+    const datadogSecretName = props?.datadogSecretName || 'datadog-api-key';
+    const datadogSecret = secretsmanager.Secret.fromSecretNameV2(
+      this,
+      'DatadogSecret',
+      datadogSecretName
+    );
+
     // ECS Cluster
     const cluster = new ecs.Cluster(this, 'Cluster', {
       vpc,
@@ -127,6 +142,9 @@ export class CdkStack extends cdk.Stack {
         environment: {
           NODE_ENV: 'production',
           PORT: '3000',
+          DD_SERVICE: appName,
+          DD_ENV: environment,
+          DD_VERSION: 'latest', // TODO: Use git SHA from CI
         },
         secrets: {
           // MongoDB Atlas connection details (construct URI in app)
@@ -136,6 +154,8 @@ export class CdkStack extends cdk.Stack {
           DB_NAME: ecs.Secret.fromSecretsManager(mongoSecret, 'database'),
           // JWT secret
           JWT_SECRET: ecs.Secret.fromSecretsManager(jwtSecret, 'secret'),
+          // Datadog API key
+          DD_API_KEY: ecs.Secret.fromSecretsManager(datadogSecret, 'api-key'),
         },
         logDriver: ecs.LogDrivers.awsLogs({
           streamPrefix: appName,

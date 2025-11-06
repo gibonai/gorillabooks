@@ -9,6 +9,7 @@ const domainName = app.node.tryGetContext('domainName');
 const hostedZoneId = app.node.tryGetContext('hostedZoneId');
 const environment = app.node.tryGetContext('environment') || 'production';
 const appName = app.node.tryGetContext('appName') || 'gorillabooks';
+const datadogSecretName = app.node.tryGetContext('datadogSecretName');
 
 new CdkStack(app, 'GorillaBooks', {
   env: {
@@ -19,4 +20,5 @@ new CdkStack(app, 'GorillaBooks', {
   hostedZoneId,
   environment,
   appName,
+  datadogSecretName,
 });

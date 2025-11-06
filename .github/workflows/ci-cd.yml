@@ -16,6 +16,8 @@ env:
   # Optional: Set these to enable custom domain with HTTPS
   DOMAIN_NAME: ${{ vars.DOMAIN_NAME || '' }}
   HOSTED_ZONE_ID: ${{ vars.HOSTED_ZONE_ID || '' }}
+  # Datadog integration
+  DATADOG_SECRET_NAME: ${{ vars.DATADOG_SECRET_NAME || 'datadog-api-key' }}
 
 permissions:
   id-token: write
@@ -151,6 +153,9 @@ jobs:
           fi
           if [ -n "${{ env.HOSTED_ZONE_ID }}" ]; then
             CONTEXT="$CONTEXT -c hostedZoneId=${{ env.HOSTED_ZONE_ID }}"
+          fi
+          if [ -n "${{ env.DATADOG_SECRET_NAME }}" ]; then
+            CONTEXT="$CONTEXT -c datadogSecretName=${{ env.DATADOG_SECRET_NAME }}"
           fi
 
           CONTEXT="$CONTEXT -c environment=${{ env.ENVIRONMENT }}"

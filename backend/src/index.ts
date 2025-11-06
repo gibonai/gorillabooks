@@ -1,3 +1,7 @@
+// Initialize Datadog FIRST - must be before any other imports
+import { initializeDatadog } from './config/datadog';
+initializeDatadog();
+
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -6,6 +10,7 @@ import path from 'path';
 import { config } from './config/env';
 import { connectDatabase } from './config/database';
 import { errorHandler } from './middleware/errorHandler';
+import { metricsMiddleware } from './middleware/metricsMiddleware';
 import authRoutes from './routes/authRoutes';
 import transactionRoutes from './routes/transactionRoutes';
 
@@ -16,6 +21,7 @@ app.use(helmet());
 app.use(cors());
 app.use(express.json());
 app.use(morgan('dev'));
+app.use(metricsMiddleware);
 
 // Health check
 app.get('/health', (_req, res) => {
