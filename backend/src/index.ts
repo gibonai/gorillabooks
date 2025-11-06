@@ -43,12 +43,20 @@ app.use(errorHandler);
 // Start server
 const startServer = async () => {
   try {
-    await connectDatabase();
-
+    // Start listening immediately so health checks pass
     app.listen(config.port, () => {
       console.log(`🦍 GorillaBooks API running on port ${config.port}`);
       console.log(`Environment: ${config.nodeEnv}`);
     });
+
+    // Try to connect to database, but don't crash if it fails
+    try {
+      await connectDatabase();
+      console.log('✅ Database connected successfully');
+    } catch (dbError) {
+      console.error('⚠️  Database connection failed - API will continue without database:', dbError);
+      console.error('API endpoints requiring database will return errors');
+    }
   } catch (error) {
     console.error('Failed to start server:', error);
     process.exit(1);

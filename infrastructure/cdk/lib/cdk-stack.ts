@@ -4,7 +4,6 @@ import * as ecs from 'aws-cdk-lib/aws-ecs';
 import * as ecs_patterns from 'aws-cdk-lib/aws-ecs-patterns';
 import * as elbv2 from 'aws-cdk-lib/aws-elasticloadbalancingv2';
 import * as ecr from 'aws-cdk-lib/aws-ecr';
-import * as docdb from 'aws-cdk-lib/aws-docdb';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as route53 from 'aws-cdk-lib/aws-route53';
@@ -81,27 +80,13 @@ export class CdkStack extends cdk.Stack {
       },
     });
 
-    // DocumentDB Cluster with auto-generated credentials
-    const dbCluster = new docdb.DatabaseCluster(this, 'Database', {
-      masterUser: {
-        username: appName,
-      },
-      instanceType: ec2.InstanceType.of(
-        ec2.InstanceClass.T4G,
-        ec2.InstanceSize.MEDIUM
-      ),
-      instances: 1,
-      vpc,
-      vpcSubnets: {
-        subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
-      },
-      backup: {
-        retention: cdk.Duration.days(1),
-        preferredWindow: '03:00-04:00',
-      },
-      preferredMaintenanceWindow: 'mon:04:00-mon:05:00',
-      removalPolicy: cdk.RemovalPolicy.DESTROY, // For dev/testing
-    });
+    // Reference to MongoDB Atlas secret (created manually with credentials)
+    // Expected format: { "username": "...", "password": "...", "host": "...", "database": "gorillabooks" }
+    const mongoSecret = secretsmanager.Secret.fromSecretNameV2(
+      this,
+      'MongoAtlasSecret',
+      'mongodb-atlas-gorillabooks'
+    );
 
     // ECS Cluster
     const cluster = new ecs.Cluster(this, 'Cluster', {
@@ -144,11 +129,11 @@ export class CdkStack extends cdk.Stack {
           PORT: '3000',
         },
         secrets: {
-          // DocumentDB connection details (construct URI in app)
-          DB_HOST: ecs.Secret.fromSecretsManager(dbCluster.secret!, 'host'),
-          DB_PORT: ecs.Secret.fromSecretsManager(dbCluster.secret!, 'port'),
-          DB_USERNAME: ecs.Secret.fromSecretsManager(dbCluster.secret!, 'username'),
-          DB_PASSWORD: ecs.Secret.fromSecretsManager(dbCluster.secret!, 'password'),
+          // MongoDB Atlas connection details (construct URI in app)
+          DB_HOST: ecs.Secret.fromSecretsManager(mongoSecret, 'host'),
+          DB_USERNAME: ecs.Secret.fromSecretsManager(mongoSecret, 'username'),
+          DB_PASSWORD: ecs.Secret.fromSecretsManager(mongoSecret, 'password'),
+          DB_NAME: ecs.Secret.fromSecretsManager(mongoSecret, 'database'),
           // JWT secret
           JWT_SECRET: ecs.Secret.fromSecretsManager(jwtSecret, 'secret'),
         },
@@ -169,12 +154,6 @@ export class CdkStack extends cdk.Stack {
       },
       assignPublicIp: false, // No public IP needed - using NAT gateway
     });
-
-    // Allow ECS tasks to connect to DocumentDB
-    dbCluster.connections.allowDefaultPortFrom(
-      service.service,
-      'Allow ECS tasks to connect to DocumentDB'
-    );
 
     // Health check configuration
     service.targetGroup.configureHealthCheck({
@@ -225,6 +204,23 @@ export class CdkStack extends cdk.Stack {
         value: `https://${props.domainName}`,
         description: 'Application Domain URL',
       });
+    }
+
+    // Output NAT Gateway Elastic IP for MongoDB Atlas whitelisting
+    const natGateway = vpc.publicSubnets[0].node.children.find(
+      (child) => child.node.id === 'NATGateway'
+    );
+    if (natGateway) {
+      const eip = natGateway.node.children.find(
+        (child) => child.node.id === 'EIP'
+      ) as ec2.CfnEIP;
+      if (eip) {
+        new cdk.CfnOutput(this, 'NATGatewayIP', {
+          value: eip.ref,
+          description: 'NAT Gateway Elastic IP - Whitelist this in MongoDB Atlas',
+          exportName: `${appName}-${environment}-nat-ip`,
+        });
+      }
     }
   }
 }
