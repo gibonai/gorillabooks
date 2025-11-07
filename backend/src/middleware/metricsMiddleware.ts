@@ -16,12 +16,15 @@ export const metricsMiddleware = (
   const startTime = Date.now();
 
   // Capture original end function
-  const originalEnd = res.end;
+  const originalEnd = res.end.bind(res);
 
   // Override res.end to capture metrics when response is sent
   res.end = function (
-    ...args: Parameters<typeof res.end>
-  ): ReturnType<typeof res.end> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    chunk?: any,
+    encodingOrCb?: BufferEncoding | (() => void),
+    cb?: () => void
+  ): Response {
     const duration = Date.now() - startTime;
     const statusCode = res.statusCode;
     const method = req.method;
@@ -50,9 +53,24 @@ export const metricsMiddleware = (
       metrics.increment('http.success', 1, tags);
     }
 
-    // Call original end function
-    return originalEnd.apply(res, args);
-  };
+    // Call original end function with proper overload handling
+    if (typeof encodingOrCb === 'function') {
+      // res.end(chunk, callback)
+      return originalEnd(chunk, encodingOrCb);
+    } else if (encodingOrCb && cb) {
+      // res.end(chunk, encoding, callback)
+      return originalEnd(chunk, encodingOrCb as BufferEncoding, cb);
+    } else if (encodingOrCb) {
+      // res.end(chunk, encoding)
+      return originalEnd(chunk, encodingOrCb as BufferEncoding);
+    } else if (chunk !== undefined) {
+      // res.end(chunk)
+      return originalEnd(chunk);
+    } else {
+      // res.end()
+      return originalEnd();
+    }
+  } as typeof res.end;
 
   next();
 };

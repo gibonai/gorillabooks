@@ -7,7 +7,6 @@ export const initializeDatadog = () => {
   if (process.env.DD_API_KEY) {
     tracer.init({
       logInjection: true,
-      analytics: true,
       runtimeMetrics: true,
     });
     console.log('✅ Datadog APM initialized');

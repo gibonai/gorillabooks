@@ -12,6 +12,7 @@
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
+    "verify": "npm run lint && npm run type-check && npm test",
     "type-check": "npm run type-check --workspaces --if-present",
     "docker:dev": "docker-compose up",
     "docker:dev:build": "docker-compose up --build",
